@@ -25,23 +25,19 @@ jobs:
           echo "Found ZIP: $ZIP"
           unzip -o "$ZIP" -d vyra_project
 
-      - name: Find Android project
+      - name: Locate Android Project
         run: |
-          echo "Searching for Gradle wrapper..."
+          PROJECT_ROOT=$(find vyra_project -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1)
 
-          GRADLEW=$(find vyra_project -type f -name "gradlew" | head -n 1)
-
-          if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew not found anywhere!"
-            echo "Files inside project:"
-            find vyra_project -maxdepth 5 -type f | sort
+          if [ -z "$PROJECT_ROOT" ]; then
+            echo "ERROR: settings.gradle not found"
             exit 1
           fi
 
-          PROJECT_ROOT=$(dirname "$GRADLEW")
+          PROJECT_ROOT=$(dirname "$PROJECT_ROOT")
 
-          echo "Found gradlew at:"
-          echo "$GRADLEW"
+          echo "Android project found at:"
+          echo "$PROJECT_ROOT"
 
           echo "PROJECT_ROOT=$PROJECT_ROOT" >> "$GITHUB_ENV"
 
@@ -50,6 +46,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Accept Android SDK licenses
         run: |
@@ -74,8 +73,7 @@ jobs:
       - name: Build VYRA APK
         working-directory: ${{ env.PROJECT_ROOT }}
         run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+          gradle --no-daemon assembleDebug
 
       - name: Find APK
         run: |
