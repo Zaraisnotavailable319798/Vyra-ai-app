@@ -1,0 +1,78 @@
+name: Build VYRA APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find VYRA ZIP
+        run: |
+          echo "Looking for ZIP..."
+          find . -maxdepth 2 -type f -iname "*.zip" -print
+
+      - name: Extract VYRA project
+        run: |
+          mkdir -p vyra_project
+
+          ZIP=$(find . -maxdepth 2 -type f -iname "*.zip" | head -n 1)
+
+          if [ -z "$ZIP" ]; then
+            echo "ERROR: No ZIP file found."
+            exit 1
+          fi
+
+          echo "Using: $ZIP"
+          unzip -o "$ZIP" -d vyra_project
+
+      - name: Locate Gradle project
+        run: |
+          echo "Searching for settings.gradle..."
+          find vyra_project -name "settings.gradle" -o -name "settings.gradle.kts"
+
+      - name: Find project root
+        run: |
+          ROOT=$(find vyra_project -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1)
+
+          if [ -z "$ROOT" ]; then
+            echo "ERROR: No Gradle Android project found inside ZIP."
+            exit 1
+          fi
+
+          PROJECT_ROOT=$(dirname "$ROOT")
+
+          echo "PROJECT_ROOT=$PROJECT_ROOT" >> $GITHUB_ENV
+
+          echo "Project root:"
+          echo "$PROJECT_ROOT"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build APK
+        working-directory: ${{ env.PROJECT_ROOT }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Find APK
+        run: |
+          find "${{ env.PROJECT_ROOT }}" -type f -name "*.apk" -print
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VYRA-APK
+          path: |
+            ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/*.apk
